@@ -534,6 +534,7 @@ unstr_t *unstr_sprintf(unstr_t *str, const char *format, ...)
 			format--;
 			break;
 		}
+		format++;
 	}
 	unstr_strcat_char(str, format);
 	va_end(list);
