@@ -206,6 +206,32 @@ unstr_bool_t unstr_empty(const unstr_t *str)
 }
 
 /**
+ * @brief			unstr_t型にバイナリをコピーする
+ * @param[in,out]	us		コピー先
+ * @param[in]		s		コピー元
+ * @param[in]		offset	コピー先の開始位置
+ * @param[in]		len		コピーする長さ
+ * @return			コピー結果
+ * @return			UNSTRING_TRUE	成功
+ * @return			UNSTRING_FALSE	失敗
+ * @public
+ */
+unstr_bool_t unstr_write(unstr_t *us, const char *bin, size_t offset, size_t len)
+{
+	size_t size = len + offset;
+	if(!unstr_isset(us) || (bin == NULL)){
+		return UNSTRING_FALSE;
+	}
+	if(unstr_check_heap_size(us, size + 1)){
+		unstr_alloc(us, size + 1);
+	}
+	memcpy(&(us->data[offset]), bin, len);
+	us->length = size;
+	us->data[us->length] = '\0';
+	return UNSTRING_TRUE;
+}
+
+/**
  * @brief		文字列の長さを返す
  * @param[in]	str		対象文字列
  * @return		文字列の長さ
@@ -213,14 +239,11 @@ unstr_bool_t unstr_empty(const unstr_t *str)
  */
 size_t unstr_strlen(const unstr_t *str)
 {
-	if(unstr_isset(str)){
-		return str->length;
-	}
-	return 0;
+	return unstr_isset(str) ? str->length : 0;
 }
 
 /**
- * @brief		文字列のコピーを返す。領域の大きさもある程度揃える
+ * @brief		文字列のコピーを返す。
  * @param[in]	str		コピー元
  * @return		コピーした文字列
  * @public
@@ -229,7 +252,8 @@ unstr_t *unstr_copy(const unstr_t *str)
 {
 	unstr_t *data = 0;
 	if(unstr_isset(str)){
-		data = unstr_init(str->data);
+		data = unstr_init_memory(str->length + 2);
+		unstr_strcat(data, str);
 	}
 	return data;
 }
@@ -245,11 +269,8 @@ unstr_t *unstr_copy(const unstr_t *str)
  */
 unstr_bool_t unstr_strcpy(unstr_t *s1, const unstr_t *s2)
 {
-	if(unstr_isset(s1)){
-		unstr_zero(s1);
-		return unstr_strcat(s1, s2);
-	}
-	return UNSTRING_FALSE;
+	unstr_zero(s1);
+	return unstr_strcat(s1, s2);
 }
 
 /**
@@ -263,14 +284,8 @@ unstr_bool_t unstr_strcpy(unstr_t *s1, const unstr_t *s2)
  */
 unstr_bool_t unstr_strcpy_char(unstr_t *s1, const char *s2)
 {
-	unstr_t *str = 0;
-	if((!unstr_isset(s1)) || (s2 == NULL)){
-		return UNSTRING_FALSE;
-	}
-	str = unstr_init(s2);
-	unstr_strcpy(s1, str);
-	unstr_free(str);
-	return UNSTRING_TRUE;
+	unstr_zero(s1);
+	return unstr_strcat_char(s1, s2);
 }
 
 /**
@@ -285,35 +300,35 @@ unstr_bool_t unstr_strcpy_char(unstr_t *s1, const char *s2)
  */
 unstr_bool_t unstr_substr(unstr_t *s1, const unstr_t *s2, size_t len)
 {
-	if((!unstr_isset(s1)) || unstr_empty(s2)) return UNSTRING_FALSE;
+	if(!unstr_isset(s1) || unstr_empty(s2) || (len == 0)){
+		return UNSTRING_FALSE;
+	}
 	if(s2->length < len){
 		len = s2->length;
 	}
-	return unstr_substr_char(s1, s2->data, len);
+	return unstr_write(s1, s2->data, 0, len);
 }
 
 /**
  * @brief		char文字列を切り出してunstr_t文字列に変換する
- * @param[out]	data	コピー先文字列
- * @param[in]	str		対象文字列
+ * @param[out]	str		コピー先文字列
+ * @param[in]	c		対象文字列
  * @param[in]	size	コピーする長さ
  * @return		変換結果
  * @return		UNSTRING_TRUE	成功
  * @return		UNSTRING_FALSE	失敗
  * @public
  */
-unstr_bool_t unstr_substr_char(unstr_t *data, const char *str, size_t len)
+unstr_bool_t unstr_substr_char(unstr_t *str, const char *c, size_t len)
 {
-	if(!unstr_isset(data)) return UNSTRING_FALSE;
-	if(str == NULL) return UNSTRING_FALSE;
-	unstr_zero(data);
-	if(unstr_check_heap_size(data, len + 1)){
-		unstr_alloc(data, len);
+	unstr_t *data = 0;
+	unstr_bool_t ret = UNSTRING_FALSE;
+	if(c != NULL){
+		data = unstr_init(c);
+		ret = unstr_substr(str, data, len);
+		unstr_free(data);
 	}
-	memcpy(data->data, str, len);
-	data->data[len] = '\0';
-	data->length = len;
-	return UNSTRING_TRUE;
+	return ret;
 }
 
 /**
@@ -327,14 +342,10 @@ unstr_bool_t unstr_substr_char(unstr_t *data, const char *str, size_t len)
  */
 unstr_bool_t unstr_strcat(unstr_t *s1, const unstr_t *s2)
 {
-	if((!unstr_isset(s1)) || unstr_empty(s2)) return UNSTRING_FALSE;
-	if(unstr_check_heap_size(s1, s2->length + 1)){
-		unstr_alloc(s1, s2->length);
+	if(!unstr_isset(s1) || unstr_empty(s2)){
+		return UNSTRING_FALSE;
 	}
-	memcpy(&(s1->data[s1->length]), s2->data, s2->length);
-	s1->length += s2->length;
-	s1->data[s1->length] = '\0';
-	return UNSTRING_TRUE;
+	return unstr_write(s1, s2->data, s1->length, s2->length);
 }
 
 /**
@@ -350,10 +361,11 @@ unstr_bool_t unstr_strcat_char(unstr_t *str, const char *c)
 {
 	unstr_t *data = 0;
 	unstr_bool_t ret = UNSTRING_FALSE;
-	if((!unstr_isset(str)) || (c == NULL)) return UNSTRING_FALSE;
-	data = unstr_init(c);
-	ret = unstr_strcat(str, data);
-	unstr_free(data);
+	if(c != NULL){
+		data = unstr_init(c);
+		ret = unstr_strcat(str, data);
+		unstr_free(data);
+	}
 	return ret;
 }
 
@@ -435,7 +447,7 @@ char* unstr_strstr_char(const unstr_t *s1, const char *s2)
  * @return		unstr_tの配列
  * @public
  */
-unstr_t **unstr_split(unstr_t *str, const char *tmp, size_t *len)
+unstr_t **unstr_explode(unstr_t *str, const char *tmp, size_t *len)
 {
 	unstr_t *data = 0;
 	unstr_t *s = 0;
@@ -746,17 +758,12 @@ unstr_t *unstr_file_get_contents(const unstr_t *filename)
  */
 unstr_bool_t unstr_file_put_contents(const unstr_t *filename, const unstr_t *data, const char *mode)
 {
-	size_t size = 0;
-	FILE *fp = fopen(filename->data, mode);
-	if(fp == NULL){
-		return UNSTRING_FALSE;
-	}
-	if(unstr_empty(data)){
-		fclose(fp);
-		return UNSTRING_FALSE;
-	}
+	FILE *fp = 0;
+	if(unstr_empty(data)) return UNSTRING_FALSE;
+	fp = fopen(filename->data, mode);
+	if(fp == NULL) return UNSTRING_FALSE;
 	/* ftell(fp); */
-	size = fwrite(data->data, 1, data->length, fp);
+	fwrite(data->data, 1, data->length, fp);
 	fclose(fp);
 	return UNSTRING_TRUE;
 }
@@ -775,7 +782,7 @@ unstr_t *unstr_replace(unstr_t *data, unstr_t *search, unstr_t *replace)
 	size_t size = 0;
 	char *pt = data->data;
 	char *index = 0;
-	
+
 	if(unstr_empty(data) || unstr_empty(search) || unstr_empty(replace)){
 		return NULL;
 	}
@@ -804,49 +811,64 @@ unstr_t *unstr_replace(unstr_t *data, unstr_t *search, unstr_t *replace)
 }
 
 /**
- * @brief		クイックサーチのお試し実装
+ * @brief		出現数をカウント
  * @param[in]	text	対象文字列
  * @param[in]	search	検索文字列
- * @param[out]	size	戻り値配列の要素数
- * @return		検索文字列に一致した文字列の先頭要素をまとめた配列
+ * @return		検索文字列の出現数
  * @public
  */
-size_t *unstr_quick_search(unstr_t *text, unstr_t *search, size_t *size)
+size_t unstr_substr_count(unstr_t *text, unstr_t *search)
 {
-	unsigned char *x = (unsigned char *)search->data;
-	size_t m = search->length;
-	unsigned char *y = (unsigned char *)text->data;
-	size_t n = text->length;
-	size_t j = 0;
+	unsigned char *x = 0;
+	size_t m = 0;
+	unsigned char *y = 0;
+	size_t n = 0;
 	size_t count = 0;
+	size_t i = 0;
 	size_t table[256] = {0};
 
-	// 初期化
-	size_t *array = unstr_malloc(sizeof(size_t) * 16);
-
-	for(j = 0; j < 256; ++j){
-		table[j] = m + 1;
+	if(unstr_empty(text) || unstr_empty(search)){
+		return 0;
 	}
-	for(j = 0; j < m; ++j){
-		table[x[j]] = m - j;
+	x = (unsigned char *)search->data;
+	m = unstr_strlen(search);
+	y = (unsigned char *)text->data;
+	n = unstr_strlen(text);
+
+	// クイックサーチ
+	for(i = 0; i < 256; i++){
+		table[i] = m + 1;
+	}
+	for(i = 0; i < m; i++){
+		table[x[i]] = m - i;
 	}
 
-	j = 0;
-	while(j <= n - m){
-		if(memcmp(x, y + j, m) == 0){
-			array[count++] = j;
-			if((count % 16) == 0){
-				array = unstr_realloc(array, (count + 16) * sizeof(size_t), count * sizeof(size_t));
-			}
+	for(i = 0; i <= n - m;){
+		if(memcmp(x, y + i, m) == 0){
+			count++;
 		}
-		j += table[y[j + m]];
+		i += table[y[i + m]];
 	}
-	if(count == 0){
-		free(array);
-		array = NULL;
+	return count;
+}
+
+/**
+ * @brief		出現数をカウント
+ * @param[in]	text	対象文字列
+ * @param[in]	search	検索文字列
+ * @return		検索文字列の出現数
+ * @public
+ */
+size_t unstr_substr_count_char(unstr_t *text, char *search)
+{
+	size_t count = 0;
+	unstr_t *str = 0;
+	if(search != NULL){
+		str = unstr_init(search);
+		count = unstr_substr_count(text, str);
+		unstr_free(str);
 	}
-	*size = count;
-	return array;
+	return count;
 }
 
 /**
@@ -867,12 +889,12 @@ unstr_t *unstr_strtok(unstr_t *str, const char *delim, size_t *index)
 	char *ptr = 0;
 	size_t len = 0;
 	size_t i = 0;
-	if(index == NULL) return NULL;
-	if(unstr_empty(str)) return NULL;
-	if((*index) > str->length) return NULL;
+	if((index == NULL) || unstr_empty(str) || ((*index) > unstr_strlen(str))){
+		return NULL;
+	}
 	ptr = str->data + (*index);
 	p = strstr(ptr, delim);
-	if(p){
+	if(p != NULL){
 		len = strlen(delim);
 		for(i = 0; i < len; i++){
 			p[i] = '\0';
@@ -883,5 +905,45 @@ unstr_t *unstr_strtok(unstr_t *str, const char *delim, size_t *index)
 	}
 	data = unstr_init(ptr);
 	return data;
+}
+
+/**
+ * @brief		繰り返し文字列を生成する
+ * @param[in]	str		繰り返す文字列
+ * @param[in]	count	繰り返す回数
+ * @return		生成した文字列
+ * @public
+ */
+unstr_t *unstr_repeat(unstr_t *str, size_t count)
+{
+	unstr_t *data = 0;
+	size_t i = 0;
+	if(unstr_empty(str) || (count == 0)){
+		return NULL;
+	}
+	data = unstr_init_memory((unstr_strlen(str) * count) + 2);
+	for(i = 0; i < count; i++){
+		unstr_strcat(data, str);
+	}
+	return data;
+}
+
+/**
+ * @brief		繰り返し文字列を生成する
+ * @param[in]	str		繰り返す文字列
+ * @param[in]	count	繰り返す回数
+ * @return		生成した文字列
+ * @public
+ */
+unstr_t *unstr_repeat_char(char *str, size_t count)
+{
+	unstr_t *data = 0;
+	unstr_t *ret = 0;
+	if(str != NULL){
+		data = unstr_init(str);
+		ret = unstr_repeat(data, count);
+		unstr_free(data);
+	}
+	return ret;
 }
 
