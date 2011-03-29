@@ -888,22 +888,21 @@ unstr_t *unstr_strtok(unstr_t *str, const char *delim, size_t *index)
 	char *p = 0;
 	char *ptr = 0;
 	size_t len = 0;
-	size_t i = 0;
-	if((index == NULL) || unstr_empty(str) || ((*index) > unstr_strlen(str))){
+	size_t slen = unstr_strlen(str);
+	if((index == NULL) || unstr_empty(str) || (*index > slen)){
 		return NULL;
 	}
+	data = unstr_init_memory(UNSTRING_HEAP_SIZE);
 	ptr = str->data + (*index);
 	p = strstr(ptr, delim);
 	if(p != NULL){
-		len = strlen(delim);
-		for(i = 0; i < len; i++){
-			p[i] = '\0';
-		}
-		*index += (size_t)(p - ptr) + len;
+		len = (size_t)(p - ptr);
+		unstr_substr_char(data, ptr, len);
+		*index += len + strlen(delim);
 	} else {
-		*index = str->length + 1;
+		unstr_substr_char(data, ptr, slen - (*index));
+		*index = slen + 1;
 	}
-	data = unstr_init(ptr);
 	return data;
 }
 
