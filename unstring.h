@@ -46,15 +46,16 @@ extern char *unstr_strstr_char(const unstr_t *s1, const char *s2);
 extern unstr_t **unstr_explode(unstr_t *str, const char *tmp, size_t *len);
 extern unstr_t *unstr_sprintf(unstr_t *str, const char *format, ...);
 extern size_t unstr_sscanf(const unstr_t *data, const char *format, ...);
-extern unstr_bool_t unstr_reverse(unstr_t *str);
+extern unstr_t *unstr_reverse(const unstr_t *str);
 extern unstr_t *unstr_itoa(int num, size_t physics);
 extern unstr_t *unstr_file_get_contents(const unstr_t *filename);
 extern unstr_bool_t unstr_file_put_contents(const unstr_t *filename, const unstr_t *data, const char *mode);
-extern unstr_t *unstr_replace(unstr_t *data, unstr_t *search, unstr_t *replace);
-extern size_t unstr_substr_count(unstr_t *text, unstr_t *search);
-extern size_t unstr_substr_count_char(unstr_t *text, char *search);
-extern unstr_t *unstr_strtok(unstr_t *str, const char *delim, size_t *index);
-extern unstr_t *unstr_repeat(unstr_t *str, size_t count);
-extern unstr_t *unstr_repeat_char(char *str, size_t count);
+extern unstr_t *unstr_replace(const unstr_t *data, const unstr_t *search, const unstr_t *replace);
+extern int unstr_strpos(const unstr_t *text, const unstr_t *search);
+extern size_t unstr_substr_count(const unstr_t *text, const unstr_t *search);
+extern size_t unstr_substr_count_char(const unstr_t *text, const char *search);
+extern unstr_t *unstr_strtok(const unstr_t *str, const char *delim, size_t *index);
+extern unstr_t *unstr_repeat(const unstr_t *str, size_t count);
+extern unstr_t *unstr_repeat_char(const char *str, size_t count);
 
 #endif /* UNSTRING_H_INCLUDE */

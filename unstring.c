@@ -305,7 +305,7 @@ unstr_bool_t unstr_strcpy_char(unstr_t *s1, const char *s2)
  */
 unstr_bool_t unstr_substr(unstr_t *s1, const unstr_t *s2, size_t len)
 {
-	if(!unstr_isset(s1) || unstr_empty(s2) || (len == 0)){
+	if(!unstr_isset(s1) || unstr_empty(s2)){
 		return UNSTRING_FALSE;
 	}
 	if(s2->length < len){
@@ -386,10 +386,13 @@ unstr_bool_t unstr_strcat_char(unstr_t *str, const char *c)
  */
 int unstr_strcmp(const unstr_t *s1, const unstr_t *s2)
 {
+	int ret = 0x100;
 	if(unstr_isset(s1) && unstr_isset(s2)){
-		return strcmp(s1->data, s2->data);
+		if(s1->length == s2->length){
+			ret = memcmp(s1->data, s2->data, s1->length);
+		}
 	}
-	return 0x100;
+	return ret;
 }
 
 /**
@@ -404,10 +407,14 @@ int unstr_strcmp(const unstr_t *s1, const unstr_t *s2)
  */
 int unstr_strcmp_char(const unstr_t *s1, const char *s2)
 {
-	if(unstr_isset(s1) && (s2 != NULL)){
-		return strcmp(s1->data, s2);
+	int ret = 0x100;
+	unstr_t *str = 0;
+	if(s2 != NULL){
+		str = unstr_init(s2);
+		ret = unstr_strcmp(s1, str);
+		unstr_free(str);
 	}
-	return 0x100;
+	return ret;
 }
 
 /**
@@ -421,8 +428,9 @@ int unstr_strcmp_char(const unstr_t *s1, const char *s2)
  */
 char* unstr_strstr(const unstr_t *s1, const unstr_t *s2)
 {
-	if(unstr_isset(s1) && unstr_isset(s2)){
-		return strstr(s1->data, s2->data);
+	int pos = unstr_strpos(s1, s2);
+	if(pos >= 0){
+		return s1->data + pos;
 	}
 	return NULL;
 }
@@ -438,10 +446,14 @@ char* unstr_strstr(const unstr_t *s1, const unstr_t *s2)
  */
 char* unstr_strstr_char(const unstr_t *s1, const char *s2)
 {
-	if(unstr_isset(s1) && (s2 != NULL)){
-		return strstr(s1->data, s2);
+	char *ret = 0;
+	unstr_t *str = 0;
+	if(s2 != NULL){
+		str = unstr_init(s2);
+		ret = unstr_strstr(s1, str);
+		unstr_free(str);
 	}
-	return NULL;
+	return ret;
 }
 
 /**
@@ -566,21 +578,22 @@ unstr_t *unstr_sprintf(unstr_t *str, const char *format, ...)
  * @return			UNSTRING_FALSE	失敗
  * @public
  */
-unstr_bool_t unstr_reverse(unstr_t *str)
+unstr_t *unstr_reverse(const unstr_t *str)
 {
 	size_t length = 0;
 	size_t size = 0;
 	size_t count = 0;
 	int c = 0;
-	if(unstr_empty(str)) return UNSTRING_FALSE;
-	length = str->length - 1;
-	size = str->length / 2;
+	unstr_t *ret = unstr_copy(str);
+	if(unstr_empty(ret)) return NULL;
+	length = ret->length - 1;
+	size = ret->length / 2;
 	while(count < size){
-		c = str->data[count];
-		str->data[count++] = str->data[length];
-		str->data[length--] = c;
+		c = ret->data[count];
+		ret->data[count++] = ret->data[length];
+		ret->data[length--] = c;
 	}
-	return UNSTRING_TRUE;
+	return ret;
 }
 
 /**
@@ -597,6 +610,7 @@ unstr_t *unstr_itoa(int num, size_t physics)
 	unstr_bool_t flag = UNSTRING_FALSE;
 	size_t number = 0;
 	unstr_t *str = 0;
+	unstr_t *ret = 0;
 	if((physics < 2) || (physics > 36)){
 		return NULL;
 	}
@@ -630,8 +644,9 @@ unstr_t *unstr_itoa(int num, size_t physics)
 		str->data[str->length++] = '-';
 	}
 	str->data[str->length] = '\0';
-	unstr_reverse(str);
-	return str;
+	ret = unstr_reverse(str);
+	unstr_free(str);
+	return ret;
 }
 
 /**
@@ -781,7 +796,7 @@ unstr_bool_t unstr_file_put_contents(const unstr_t *filename, const unstr_t *dat
  * @return		対象文字列から置換対象文字列を置換文字列に置換した文字列
  * @public
  */
-unstr_t *unstr_replace(unstr_t *data, unstr_t *search, unstr_t *replace)
+unstr_t *unstr_replace(const unstr_t *data, const unstr_t *search, const unstr_t *replace)
 {
 	unstr_t *str = 0;
 	size_t size = 0;
@@ -816,13 +831,54 @@ unstr_t *unstr_replace(unstr_t *data, unstr_t *search, unstr_t *replace)
 }
 
 /**
+ * @brief		文字列を検索し、発見した文字位置を返す
+ * @param[in]	text	対象文字列
+ * @param[in]	search	検索文字列
+ * @return		文字位置
+ * @public
+ */
+int unstr_strpos(const unstr_t *text, const unstr_t *search)
+{
+	unsigned char *x = 0;
+	size_t m = 0;
+	unsigned char *y = 0;
+	size_t n = 0;
+	size_t i = 0;
+	size_t table[256] = {0};
+
+	if(unstr_empty(text) || unstr_empty(search)){
+		return -1;
+	}
+	x = (unsigned char *)search->data;
+	m = unstr_strlen(search);
+	y = (unsigned char *)text->data;
+	n = unstr_strlen(text);
+
+	// クイックサーチ
+	for(i = 0; i < 256; i++){
+		table[i] = m + 1;
+	}
+	for(i = 0; i < m; i++){
+		table[x[i]] = m - i;
+	}
+
+	for(i = 0; i <= n - m;){
+		if(memcmp(x, y + i, m) == 0){
+			return (int)i;
+		}
+		i += table[y[i + m]];
+	}
+	return -1;
+}
+
+/**
  * @brief		出現数をカウント
  * @param[in]	text	対象文字列
  * @param[in]	search	検索文字列
  * @return		検索文字列の出現数
  * @public
  */
-size_t unstr_substr_count(unstr_t *text, unstr_t *search)
+size_t unstr_substr_count(const unstr_t *text, const unstr_t *search)
 {
 	unsigned char *x = 0;
 	size_t m = 0;
@@ -864,7 +920,7 @@ size_t unstr_substr_count(unstr_t *text, unstr_t *search)
  * @return		検索文字列の出現数
  * @public
  */
-size_t unstr_substr_count_char(unstr_t *text, char *search)
+size_t unstr_substr_count_char(const unstr_t *text, const char *search)
 {
 	size_t count = 0;
 	unstr_t *str = 0;
@@ -878,7 +934,7 @@ size_t unstr_substr_count_char(unstr_t *text, char *search)
 
 /**
  * @brief			文字列をトークンで切り分ける
- * @param[in,out]	str		対象文字列。改変されます。
+ * @param[in,out]	str		対象文字列。
  * @param[in]		delim	トークン(文字列可)
  * @param[in,out]	index	インデックス値。次回呼び出し時に必要
  * @return			切り出した文字列
@@ -887,7 +943,7 @@ size_t unstr_substr_count_char(unstr_t *text, char *search)
  * @par				詳細:
  * delimで指定された「文字列」でstrを切り分けます。
  */
-unstr_t *unstr_strtok(unstr_t *str, const char *delim, size_t *index)
+unstr_t *unstr_strtok(const unstr_t *str, const char *delim, size_t *index)
 {
 	unstr_t *data = 0;
 	char *p = 0;
@@ -918,7 +974,7 @@ unstr_t *unstr_strtok(unstr_t *str, const char *delim, size_t *index)
  * @return		生成した文字列
  * @public
  */
-unstr_t *unstr_repeat(unstr_t *str, size_t count)
+unstr_t *unstr_repeat(const unstr_t *str, size_t count)
 {
 	unstr_t *data = 0;
 	size_t i = 0;
@@ -939,7 +995,7 @@ unstr_t *unstr_repeat(unstr_t *str, size_t count)
  * @return		生成した文字列
  * @public
  */
-unstr_t *unstr_repeat_char(char *str, size_t count)
+unstr_t *unstr_repeat_char(const char *str, size_t count)
 {
 	unstr_t *data = 0;
 	unstr_t *ret = 0;
