@@ -93,9 +93,10 @@ unstr_t *unstr_alloc(unstr_t *str, size_t size)
 unstr_t *unstr_init(const char *str)
 {
 	size_t size = 0;
+	unstr_t *data = 0;
 	if(str == NULL) return NULL;
 	size = strlen(str);
-	unstr_t *data = unstr_alloc(NULL, size + 1);
+	data = unstr_alloc(NULL, size + 1);
 	memcpy(data->data, str, size);
 	data->data[size] = '\0';
 	data->length = size;
@@ -110,7 +111,9 @@ unstr_t *unstr_init(const char *str)
  */
 unstr_t *unstr_init_memory(size_t size)
 {
-	unstr_t *data = unstr_alloc(NULL, size);
+	unstr_t *data = 0;
+	if(size == 0) return NULL;
+	data = unstr_alloc(NULL, size);
 	/* 長さ0の文字列扱い */
 	data->data[0] = '\0';
 	data->length = 0;
