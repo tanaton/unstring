@@ -7,7 +7,7 @@
 
 static void *unstr_malloc(size_t size);
 static void *unstr_realloc(void *p, size_t size, size_t len);
-static unstr_bool_t unstr_check_heap_size(unstr_t *str, size_t size);
+static unstr_bool_t unstr_check_heap_size(const unstr_t *str, size_t size);
 
 /**
  * @brief		メモリを確保し領域をしるしで埋める。
@@ -56,7 +56,7 @@ static void *unstr_realloc(void *p, size_t size, size_t len)
  * @return		UNSTRING_TRUE	必要
  * @return		UNSTRING_FALSE	不要
  */
-static unstr_bool_t unstr_check_heap_size(unstr_t *str, size_t size)
+static unstr_bool_t unstr_check_heap_size(const unstr_t *str, size_t size)
 {
 	return (((str->length + size) >= str->heap) ? UNSTRING_TRUE : UNSTRING_FALSE);
 }
