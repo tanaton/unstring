@@ -92,7 +92,9 @@ unstr_t *unstr_alloc(unstr_t *str, size_t size)
  */
 unstr_t *unstr_init(const char *str)
 {
-	size_t size = strlen(str);
+	size_t size = 0;
+	if(str == NULL) return NULL;
+	size = strlen(str);
 	unstr_t *data = unstr_alloc(NULL, size + 1);
 	memcpy(data->data, str, size);
 	data->data[size] = '\0';
