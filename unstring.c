@@ -220,6 +220,8 @@ unstr_bool_t unstr_empty(const unstr_t *str)
  * @return			UNSTRING_TRUE	成功
  * @return			UNSTRING_FALSE	失敗
  * @public
+ * @par				詳細:
+ * lenが0だった場合は失敗にしない。
  */
 unstr_bool_t unstr_write(unstr_t *us, const char *bin, size_t offset, size_t len)
 {
@@ -271,11 +273,15 @@ unstr_t *unstr_copy(const unstr_t *str)
  * @return			UNSTRING_TRUE	成功
  * @return			UNSTRING_FALSE	失敗
  * @public
+ * @par				詳細:
+ * s2に空文字列だった場合、s1が空文字列になります。
  */
 unstr_bool_t unstr_strcpy(unstr_t *s1, const unstr_t *s2)
 {
-	unstr_zero(s1);
-	return unstr_strcat(s1, s2);
+	if(!unstr_isset(s2)){
+		return UNSTRING_FALSE;
+	}
+	return unstr_write(s1, s2->data, 0, s2->length);
 }
 
 /**
@@ -289,8 +295,14 @@ unstr_bool_t unstr_strcpy(unstr_t *s1, const unstr_t *s2)
  */
 unstr_bool_t unstr_strcpy_char(unstr_t *s1, const char *s2)
 {
-	unstr_zero(s1);
-	return unstr_strcat_char(s1, s2);
+	unstr_bool_t ret = UNSTRING_FALSE;
+	unstr_t *str = 0;
+	if(s2 != NULL){
+		str = unstr_init(s2);
+		ret = unstr_strcpy(s1, str);
+		unstr_free(str);
+	}
+	return ret;
 }
 
 /**
@@ -344,6 +356,8 @@ unstr_bool_t unstr_substr_char(unstr_t *str, const char *c, size_t len)
  * @return			UNSTRING_TRUE	成功
  * @return			UNSTRING_FALSE	失敗
  * @public
+ * @par				詳細:
+ * s1に変化が無い場合、UNSTRING_FALSEを返します。
  */
 unstr_bool_t unstr_strcat(unstr_t *s1, const unstr_t *s2)
 {
@@ -459,37 +473,32 @@ char* unstr_strstr_char(const unstr_t *s1, const char *s2)
 /**
  * @brief		対象文字列を区切り文字で切り、格納先に格納する。
  * @param[in]	str		対象文字列
- * @param[in]	tmp		区切り文字列
+ * @param[in]	delim	区切り文字列
  * @param[out]	len		配列の長さ
  * @return		unstr_tの配列
  * @public
  */
-unstr_t **unstr_explode(unstr_t *str, const char *tmp, size_t *len)
+unstr_t **unstr_explode(const unstr_t *str, const char *delim, size_t *len)
 {
-	unstr_t *data = 0;
 	unstr_t *s = 0;
 	unstr_t **ret = 0;
+	size_t index = 0;
 	size_t size = 0;
-	size_t heap = 8;
-	if(unstr_empty(str) || tmp == NULL || len == NULL){
+	size_t heap = 0;
+	if(unstr_empty(str)
+	|| (delim == NULL)
+	|| (strlen(delim) == 0)
+	|| (len == NULL)){
 		return NULL;
 	}
-	data = unstr_copy(str);
-
-	s = unstr_strtok(data, tmp, &size);
-	if(s != NULL){
-		ret = unstr_malloc(sizeof(unstr_t *) * heap);
-		do {
-			ret[size] = s;
-			size++;
-			if(size >= heap){
-				heap += size;
-				unstr_realloc(ret, heap, size);
-			}
-			s = unstr_strtok(data, tmp, &size);
-		} while(s != NULL);
+	while((s = unstr_strtok(str, delim, &index)) != NULL){
+		if(size >= heap){
+			heap = ((heap << 1) + 8);
+			unstr_realloc(ret, heap * sizeof(unstr_t *), size * sizeof(unstr_t *));
+		}
+		ret[size] = s;
+		size++;
 	}
-	unstr_free(data);
 	*len = size;
 	return ret;
 }
@@ -501,6 +510,8 @@ unstr_t **unstr_explode(unstr_t *str, const char *tmp, size_t *len)
  * @param[in]		...		可変引数
  * @return			unstr_t文字列
  * @public
+ * @par			詳細:
+ * formatが空文字列の場合を許容する
  */
 unstr_t *unstr_sprintf(unstr_t *str, const char *format, ...)
 {
@@ -509,6 +520,9 @@ unstr_t *unstr_sprintf(unstr_t *str, const char *format, ...)
 	char *sp = 0;
 	int ip = 0;
 	size_t i = 0;
+	if(format == NULL){
+		return NULL;
+	}
 	va_start(list, format);
 	if(unstr_isset(str)){
 		unstr_zero(str);
@@ -571,7 +585,7 @@ unstr_t *unstr_sprintf(unstr_t *str, const char *format, ...)
 }
 
 /**
- * @brief			文字列を反転させる。破壊的。
+ * @brief			文字列を反転させる。
  * @param[in,out]	str		対象文字列
  * @return			反転結果
  * @return			UNSTRING_TRUE	成功
@@ -584,8 +598,9 @@ unstr_t *unstr_reverse(const unstr_t *str)
 	size_t size = 0;
 	size_t count = 0;
 	int c = 0;
-	unstr_t *ret = unstr_copy(str);
-	if(unstr_empty(ret)) return NULL;
+	unstr_t *ret = 0;
+	if(unstr_empty(str)) return NULL;
+	ret = unstr_copy(str);
 	length = ret->length - 1;
 	size = ret->length / 2;
 	while(count < size){
@@ -602,6 +617,8 @@ unstr_t *unstr_reverse(const unstr_t *str)
  * @param[in]	physics	基数
  * @return		unstr_t文字列
  * @public
+ * @par			詳細:
+ * 10進数以外のマイナス値には対応していない。
  */
 unstr_t *unstr_itoa(int num, size_t physics)
 {
@@ -675,8 +692,9 @@ size_t unstr_sscanf(const unstr_t *data, const char *format, ...)
 	char *index = 0;
 	char *format_end = 0;
 
-	if(!unstr_isset(data)) return 0;
-	if(format == NULL) return 0;
+	if(!unstr_isset(data) || (format == NULL)){
+		return 0;
+	}
 	/* 先頭を探索する */
 	format_end = strchr(format, '$');
 	if(format_end == NULL) return 0;
@@ -720,9 +738,7 @@ size_t unstr_sscanf(const unstr_t *data, const char *format, ...)
 		}
 		str = va_arg(list, unstr_t *);
 		if(unstr_substr_char(str, tmp, steady) == UNSTRING_TRUE){
-			if(steady > 0){
-				count++;
-			}
+			count++;
 		}
 		/* ポインタを進める */
 		tmp += steady + search->length;
@@ -803,7 +819,7 @@ unstr_t *unstr_replace(const unstr_t *data, const unstr_t *search, const unstr_t
 	char *pt = data->data;
 	char *index = 0;
 
-	if(unstr_empty(data) || unstr_empty(search) || unstr_empty(replace)){
+	if(unstr_empty(data) || unstr_empty(search) || !unstr_isset(replace)){
 		return NULL;
 	}
 	str = unstr_init_memory(data->length);
@@ -950,7 +966,11 @@ unstr_t *unstr_strtok(const unstr_t *str, const char *delim, size_t *index)
 	char *ptr = 0;
 	size_t len = 0;
 	size_t slen = unstr_strlen(str);
-	if((index == NULL) || unstr_empty(str) || (*index > slen)){
+	if(unstr_empty(str)
+	|| (delim == NULL)
+	|| (strlen(delim) == 0)
+	|| (index == NULL)
+	|| (*index > slen)){
 		return NULL;
 	}
 	data = unstr_init_memory(UNSTRING_HEAP_SIZE);

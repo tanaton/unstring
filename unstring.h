@@ -43,7 +43,7 @@ extern int unstr_strcmp(const unstr_t *s1, const unstr_t *s2);
 extern int unstr_strcmp_char(const unstr_t *s1, const char *s2);
 extern char *unstr_strstr(const unstr_t *s1, const unstr_t *s2);
 extern char *unstr_strstr_char(const unstr_t *s1, const char *s2);
-extern unstr_t **unstr_explode(unstr_t *str, const char *tmp, size_t *len);
+extern unstr_t **unstr_explode(const unstr_t *str, const char *tmp, size_t *len);
 extern unstr_t *unstr_sprintf(unstr_t *str, const char *format, ...);
 extern size_t unstr_sscanf(const unstr_t *data, const char *format, ...);
 extern unstr_t *unstr_reverse(const unstr_t *str);
