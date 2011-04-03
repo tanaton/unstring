@@ -494,7 +494,7 @@ unstr_t **unstr_explode(const unstr_t *str, const char *delim, size_t *len)
 	while((s = unstr_strtok(str, delim, &index)) != NULL){
 		if(size >= heap){
 			heap = ((heap << 1) + 8);
-			unstr_realloc(ret, heap * sizeof(unstr_t *), size * sizeof(unstr_t *));
+			ret = unstr_realloc(ret, heap * sizeof(unstr_t *), size * sizeof(unstr_t *));
 		}
 		ret[size] = s;
 		size++;
@@ -572,6 +572,9 @@ unstr_t *unstr_sprintf(unstr_t *str, const char *format, ...)
 			}
 			unstr_strcat(str, unsp);
 			unstr_free(unsp);
+			break;
+		case '%':
+			unstr_strcat_char(str, "%");
 			break;
 		default:
 			format--;
@@ -688,13 +691,14 @@ size_t unstr_sscanf(const unstr_t *data, const char *format, ...)
 	size_t steady = 0;
 	unstr_t *str = 0;
 	unstr_t *search = 0;
-	char *tmp = data->data;
+	char *tmp = 0;
 	char *index = 0;
 	char *format_end = 0;
 
 	if(!unstr_isset(data) || (format == NULL)){
 		return 0;
 	}
+	tmp = data->data;
 	/* 先頭を探索する */
 	format_end = strchr(format, '$');
 	if(format_end == NULL) return 0;
@@ -816,12 +820,13 @@ unstr_t *unstr_replace(const unstr_t *data, const unstr_t *search, const unstr_t
 {
 	unstr_t *str = 0;
 	size_t size = 0;
-	char *pt = data->data;
+	char *pt = 0;
 	char *index = 0;
 
 	if(unstr_empty(data) || unstr_empty(search) || !unstr_isset(replace)){
 		return NULL;
 	}
+	pt = data->data;
 	str = unstr_init_memory(data->length);
 	while((index = strstr(pt, search->data)) != NULL){
 		size = (size_t)(index - pt);

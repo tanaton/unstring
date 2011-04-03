@@ -14,3 +14,5 @@ SET_TARGET_PROPERTIES(unstring PROPERTIES VERSION ${serial} SOVERSION ${soserial
 INSTALL(TARGETS unstring LIBRARY DESTINATION lib)
 INSTALL(FILES unstring.h DESTINATION include)
 
+ADD_EXECUTABLE(test_unstring unstring_test.c unstring.c)
+
