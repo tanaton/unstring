@@ -1,13 +1,37 @@
 #include "unstring.h"
 #include <string.h>
 #include <stdio.h>
+#include <setjmp.h>
 
-static void check_int(int a, int b);
-static void check_unstr(const unstr_t *s1, const unstr_t *s2);
-static void check_unstr_char(const unstr_t *s1, const char *s2);
-static void check_char(const char *s1, const char *s2);
-static void check_null(void *p);
-static void test_assert(int flag);
+#define check_macro(fname, ...)	\
+	do {						\
+		if(fname(__VA_ARGS__)){	\
+			printf("file:%s\nline:%u\nfunc:%s\n", __FILE__, __LINE__, __func__);	\
+			longjmp(g_top, 1);	\
+			/* NOTREACHED */	\
+		}						\
+	} while(0)
+
+#define check_int(a, b)			check_macro(check_int_func, a, b)
+#define check_unstr(a, b)		check_macro(check_unstr_func, a, b)
+#define check_unstr_char(a, b)	check_macro(check_unstr_char_func, a, b)
+#define check_char(a, b)		check_macro(check_char_func, a, b)
+#define check_null(a)			check_macro(check_null_func, a)
+#define check_assert(a)			check_macro(check_assert_func, a)
+
+#define test(name)				test_box(test_##name, #name)
+
+typedef void (*FP)(void);
+jmp_buf g_top;
+
+static int check_int_func(int a, int b);
+static int check_unstr_func(const unstr_t *s1, const unstr_t *s2);
+static int check_unstr_char_func(const unstr_t *s1, const char *s2);
+static int check_char_func(const char *s1, const char *s2);
+static int check_null_func(void *p);
+static int check_assert_func(int flag);
+
+static void test_box(FP test_func, char *func_name);
 
 static void test_unstr_init(void);
 static void test_unstr_init_memory(void);
@@ -49,97 +73,120 @@ static void test_unstr_repeat_char(void);
 
 int main(int argc, char *argv[])
 {
-	test_unstr_init();
-	test_unstr_init_memory();
-	test_unstr_alloc();
-	test_unstr_free();
-	//test_unstr_free_func();
-	test_unstr_delete();
-	test_unstr_zero();
-	test_unstr_isset();
-	test_unstr_empty();
-	test_unstr_strlen();
-	test_unstr_write();
-	test_unstr_copy();
-	test_unstr_strcpy();
-	test_unstr_strcpy_char();
-	test_unstr_substr();
-	test_unstr_substr_char();
-	test_unstr_strcat();
-	test_unstr_strcat_char();
-	test_unstr_strcmp();
-	test_unstr_strcmp_char();
-	test_unstr_strstr();
-	test_unstr_strstr_char();
-	test_unstr_explode();
-	test_unstr_sprintf();
-	test_unstr_sscanf();
-	test_unstr_reverse();
-	test_unstr_itoa();
-	//test_unstr_file_get_contents();
-	//test_unstr_file_put_contents();
-	test_unstr_replace();
-	test_unstr_strpos();
-	test_unstr_substr_count();
-	test_unstr_substr_count_char();
-	test_unstr_strtok();
-	test_unstr_repeat();
-	test_unstr_repeat_char();
+	if(setjmp(g_top) == 0){
+		test(unstr_init);
+		test(unstr_init_memory);
+		test(unstr_alloc);
+		test(unstr_free);
+		//test(unstr_free_func);
+		test(unstr_delete);
+		test(unstr_zero);
+		test(unstr_isset);
+		test(unstr_empty);
+		test(unstr_strlen);
+		test(unstr_write);
+		test(unstr_copy);
+		test(unstr_strcpy);
+		test(unstr_strcpy_char);
+		test(unstr_substr);
+		test(unstr_substr_char);
+		test(unstr_strcat);
+		test(unstr_strcat_char);
+		test(unstr_strcmp);
+		test(unstr_strcmp_char);
+		test(unstr_strstr);
+		test(unstr_strstr_char);
+		test(unstr_explode);
+		test(unstr_sprintf);
+		test(unstr_sscanf);
+		test(unstr_reverse);
+		test(unstr_itoa);
+		//test(unstr_file_get_contents);
+		//test(unstr_file_put_contents);
+		test(unstr_replace);
+		test(unstr_strpos);
+		test(unstr_substr_count);
+		test(unstr_substr_count_char);
+		test(unstr_strtok);
+		test(unstr_repeat);
+		test(unstr_repeat_char);
+	} else {
+		printf("NG\n");
+	}
 	return 0;
 }
 
-static void check_int(int a, int b)
+static void test_box(FP test_func, char *func_name)
 {
-	if(a != b){
-		printf("数値が一致しませんでした %d != %d\n", a, b);
-	}
+	printf("test %s", func_name);
+	(*test_func)();
+	printf(" OK\n");
 }
 
-static void check_unstr(const unstr_t *s1, const unstr_t *s2)
+static int check_int_func(int a, int b)
+{
+	if(a != b){
+		printf("\n数値が一致しませんでした %d != %d\n", a, b);
+		return -1;
+	}
+	return 0;
+}
+
+static int check_unstr_func(const unstr_t *s1, const unstr_t *s2)
 {
 	if(unstr_strcmp(s1, s2)){
 		printf(
-			"文字列が一致しませんでした\n"
+			"\n文字列が一致しませんでした\n"
 			"\t'%s' != '%s'\n",
 			s1->data, s2->data
 		);
+		return -1;
 	}
+	return 0;
 }
 
-static void check_unstr_char(const unstr_t *s1, const char *s2)
+static int check_unstr_char_func(const unstr_t *s1, const char *s2)
 {
 	if(unstr_strcmp_char(s1, s2)){
 		printf(
-			"文字列が一致しませんでした\n"
+			"\n文字列が一致しませんでした\n"
 			"\t'%s' != '%s'\n",
 			s1->data, s2
 		);
+		return -1;
 	}
+	return 0;
 }
 
-static void check_char(const char *s1, const char *s2)
+static int check_char_func(const char *s1, const char *s2)
 {
 	if(strcmp(s1, s2)){
 		printf(
-			"文字列が一致しませんでした\n"
+			"\n文字列が一致しませんでした\n"
 			"\t'%s' != '%s'\n",
 			s1, s2
 		);
+		return -1;
 	}
+	return 0;
 }
 
-static void check_null(void *p)
+static int check_null_func(void *p)
 {
 	if(p != NULL){
-		printf("NULLチェック失敗\n");
+		printf("\nNULLチェック失敗\n");
+		return -1;
 	}
+	return 0;
 }
 
-static void test_assert(int flag)
+static int check_assert_func(int flag)
 {
 	if(!flag){
-		printf("比較失敗\n");
+		printf("\n比較失敗\n");
+		return -1;
 	}
+	return 0;
 }
 
 /*================================================================*/
@@ -148,7 +195,6 @@ static void test_unstr_init(void)
 {
 	char *s = "1234567890";
 	unstr_t *str = 0;
-	printf("unstr_init\n");
 	{
 		str = unstr_init(NULL);
 		check_null(str);
@@ -165,7 +211,6 @@ static void test_unstr_init_memory(void)
 {
 	unstr_t *str = 0;
 	size_t size = 0;
-	printf("unstr_init_memory\n");
 	{
 		str = unstr_init_memory(0);
 		check_null(str);
@@ -173,16 +218,12 @@ static void test_unstr_init_memory(void)
 	}{
 		size = 10;
 		str = unstr_init_memory(size);
-		if(str->heap < size){
-			printf("メモリ確保(%lu)に失敗\n", size);
-		}
+		check_assert(str->heap >= size);
 		unstr_free(str);
 	}{
 		size = 1024 * 1024 * 1024;
 		str = unstr_init_memory(size);
-		if(str->heap < size){
-			printf("メモリ確保(%lu)に失敗\n", size);
-		}
+		check_assert(str->heap >= size);
 		unstr_free(str);
 	}
 }
@@ -197,12 +238,9 @@ static void test_unstr_alloc(void)
 		0,
 		1024 * 1024 * 1024
 	};
-	printf("unstr_alloc\n");
 	for(i = 0; i < 3; i++){
 		unstr_alloc(str, s[i]);
-		if(str->heap < (hsize + s[i])){
-			printf("メモリ拡張(+%lu)に失敗\n", s[i]);
-		}
+		check_assert(str->heap >= (hsize + s[i]));
 		hsize = str->heap;
 	}
 	unstr_free(str);
@@ -211,7 +249,6 @@ static void test_unstr_alloc(void)
 static void test_unstr_free(void)
 {
 	unstr_t *str = unstr_init_memory(100);
-	printf("unstr_free\n");
 	unstr_free(str);
 	check_null(str);
 }
@@ -219,7 +256,6 @@ static void test_unstr_free(void)
 static void test_unstr_delete(void)
 {
 	unstr_t *str[3] = {0};
-	printf("unstr_delete\n");
 	str[1] = unstr_init_memory(100);
 	unstr_delete(3, str[0], str[1], str[2]);
 }
@@ -227,7 +263,6 @@ static void test_unstr_delete(void)
 static void test_unstr_zero(void)
 {
 	unstr_t *str = unstr_init("unkokkokussakusa");
-	printf("unstr_zero\n");
 	unstr_zero(str);
 	check_int(str->length, 0);
 	unstr_free(str);
@@ -236,29 +271,26 @@ static void test_unstr_zero(void)
 static void test_unstr_isset(void)
 {
 	unstr_t *str = unstr_init("unkokkokussakusa");
-	printf("unstr_isset\n");
-	test_assert(unstr_isset(NULL) == UNSTRING_FALSE);
-	test_assert(unstr_isset(str) == UNSTRING_TRUE);
+	check_assert(unstr_isset(NULL) == UNSTRING_FALSE);
+	check_assert(unstr_isset(str) == UNSTRING_TRUE);
 	unstr_zero(str);
-	test_assert(unstr_isset(str) == UNSTRING_TRUE);
+	check_assert(unstr_isset(str) == UNSTRING_TRUE);
 	unstr_free(str);
 }
 
 static void test_unstr_empty(void)
 {
 	unstr_t *str = unstr_init("unkokkokussakusa");
-	printf("unstr_empty\n");
-	test_assert(unstr_empty(NULL) == UNSTRING_TRUE);
-	test_assert(unstr_empty(str) == UNSTRING_FALSE);
+	check_assert(unstr_empty(NULL) == UNSTRING_TRUE);
+	check_assert(unstr_empty(str) == UNSTRING_FALSE);
 	unstr_zero(str);
-	test_assert(unstr_empty(str) == UNSTRING_TRUE);
+	check_assert(unstr_empty(str) == UNSTRING_TRUE);
 	unstr_free(str);
 }
 
 static void test_unstr_strlen(void)
 {
 	unstr_t *str = unstr_init("1234567890");
-	printf("unstr_strlen\n");
 	check_int(unstr_strlen(NULL), 0);
 	check_int(unstr_strlen(str), 10);
 	unstr_zero(str);
@@ -272,17 +304,16 @@ static void test_unstr_write(void)
 	char ans2[] = "1234567890 1234567890";
 	unstr_t *str = unstr_init_memory(1);
 	ans2[10] = '\0';
-	printf("unstr_write\n");
-	test_assert(unstr_write(NULL, ans, 0, 0) == UNSTRING_FALSE);
-	test_assert(unstr_write(NULL, "", 0, 0) == UNSTRING_FALSE);
-	test_assert(unstr_write(str, NULL, 0, 0) == UNSTRING_FALSE);
+	check_assert(unstr_write(NULL, ans, 0, 0) == UNSTRING_FALSE);
+	check_assert(unstr_write(NULL, "", 0, 0) == UNSTRING_FALSE);
+	check_assert(unstr_write(str, NULL, 0, 0) == UNSTRING_FALSE);
 
-	test_assert(unstr_write(str, ans, 0, 10) == UNSTRING_TRUE);
+	check_assert(unstr_write(str, ans, 0, 10) == UNSTRING_TRUE);
 	check_unstr_char(str, ans);
-	test_assert(unstr_write(str, "", 10, 0) == UNSTRING_TRUE);
+	check_assert(unstr_write(str, "", 10, 0) == UNSTRING_TRUE);
 	check_unstr_char(str, ans);
-	test_assert(unstr_write(str, ans, 11, 10) == UNSTRING_TRUE);
-	test_assert(memcmp(str->data, ans2, 21) == 0);
+	check_assert(unstr_write(str, ans, 11, 10) == UNSTRING_TRUE);
+	check_assert(memcmp(str->data, ans2, 21) == 0);
 
 	unstr_free(str);
 }
@@ -291,7 +322,6 @@ static void test_unstr_copy(void)
 {
 	unstr_t *tmp = 0;
 	unstr_t *str = unstr_init("1234567890");
-	printf("unstr_copy\n");
 	tmp = unstr_copy(NULL);
 	check_null(tmp);
 	unstr_free(tmp);
@@ -308,16 +338,15 @@ static void test_unstr_strcpy(void)
 	unstr_t *tmp = unstr_init_memory(1);
 	unstr_t *emp = unstr_init_memory(1);
 	unstr_t *str = unstr_init("unkokkokussakusa");
-	printf("unstr_strcpy\n");
-	test_assert(unstr_strcpy(NULL, str) == UNSTRING_FALSE);
-	test_assert(unstr_strcpy(NULL, tmp) == UNSTRING_FALSE);
-	test_assert(unstr_strcpy(tmp, NULL) == UNSTRING_FALSE);
+	check_assert(unstr_strcpy(NULL, str) == UNSTRING_FALSE);
+	check_assert(unstr_strcpy(NULL, tmp) == UNSTRING_FALSE);
+	check_assert(unstr_strcpy(tmp, NULL) == UNSTRING_FALSE);
 
-	test_assert(unstr_strcpy(tmp, str) == UNSTRING_TRUE);
+	check_assert(unstr_strcpy(tmp, str) == UNSTRING_TRUE);
 	check_unstr(tmp, str);
 
-	test_assert(unstr_strcpy(tmp, emp) == UNSTRING_TRUE);
-	test_assert(unstr_empty(tmp) == UNSTRING_TRUE);
+	check_assert(unstr_strcpy(tmp, emp) == UNSTRING_TRUE);
+	check_assert(unstr_empty(tmp) == UNSTRING_TRUE);
 
 	unstr_delete(3, str, tmp, emp);
 }
@@ -326,16 +355,15 @@ static void test_unstr_strcpy_char(void)
 {
 	char *str = "unkokkokussakusa";
 	unstr_t *tmp = unstr_init_memory(1);
-	printf("unstr_strcpy_char\n");
-	test_assert(unstr_strcpy_char(NULL, str) == UNSTRING_FALSE);
-	test_assert(unstr_strcpy_char(NULL, "") == UNSTRING_FALSE);
-	test_assert(unstr_strcpy_char(tmp, NULL) == UNSTRING_FALSE);
+	check_assert(unstr_strcpy_char(NULL, str) == UNSTRING_FALSE);
+	check_assert(unstr_strcpy_char(NULL, "") == UNSTRING_FALSE);
+	check_assert(unstr_strcpy_char(tmp, NULL) == UNSTRING_FALSE);
 
-	test_assert(unstr_strcpy_char(tmp, str) == UNSTRING_TRUE);
+	check_assert(unstr_strcpy_char(tmp, str) == UNSTRING_TRUE);
 	check_unstr_char(tmp, str);
 
-	test_assert(unstr_strcpy_char(tmp, "") == UNSTRING_TRUE);
-	test_assert(unstr_empty(tmp) == UNSTRING_TRUE);
+	check_assert(unstr_strcpy_char(tmp, "") == UNSTRING_TRUE);
+	check_assert(unstr_empty(tmp) == UNSTRING_TRUE);
 
 	unstr_free(tmp);
 }
@@ -349,19 +377,18 @@ static void test_unstr_substr(void)
 	unstr_t *tmp = unstr_init_memory(1);
 	unstr_t *emp = unstr_init_memory(1);
 	unstr_t *str = unstr_init("1234567890");
-	printf("unstr_substr\n");
-	test_assert(unstr_substr(NULL, str, 3) == UNSTRING_FALSE);
-	test_assert(unstr_substr(tmp, NULL, 3) == UNSTRING_FALSE);
-	test_assert(unstr_substr(tmp, emp, 3) == UNSTRING_FALSE);
+	check_assert(unstr_substr(NULL, str, 3) == UNSTRING_FALSE);
+	check_assert(unstr_substr(tmp, NULL, 3) == UNSTRING_FALSE);
+	check_assert(unstr_substr(tmp, emp, 3) == UNSTRING_FALSE);
 
-	test_assert(unstr_substr(tmp, str, 0) == UNSTRING_TRUE);
-	test_assert(unstr_empty(tmp) == UNSTRING_TRUE);
+	check_assert(unstr_substr(tmp, str, 0) == UNSTRING_TRUE);
+	check_assert(unstr_empty(tmp) == UNSTRING_TRUE);
 
-	test_assert(unstr_substr(tmp, str, 3) == UNSTRING_TRUE);
+	check_assert(unstr_substr(tmp, str, 3) == UNSTRING_TRUE);
 	check_unstr_char(tmp, ans[0]);
 
 	unstr_strcpy_char(str, "unkokkokussakusa");
-	test_assert(unstr_substr(tmp, str, 7) == UNSTRING_TRUE);
+	check_assert(unstr_substr(tmp, str, 7) == UNSTRING_TRUE);
 	check_unstr_char(tmp, ans[1]);
 
 	unstr_delete(3, str, tmp, emp);
@@ -375,19 +402,18 @@ static void test_unstr_substr_char(void)
 	};
 	unstr_t *tmp = unstr_init_memory(1);
 	char *str = "1234567890";
-	printf("unstr_substr_char\n");
-	test_assert(unstr_substr_char(NULL, str, 3) == UNSTRING_FALSE);
-	test_assert(unstr_substr_char(tmp, NULL, 3) == UNSTRING_FALSE);
-	test_assert(unstr_substr_char(tmp, "", 3) == UNSTRING_FALSE);
+	check_assert(unstr_substr_char(NULL, str, 3) == UNSTRING_FALSE);
+	check_assert(unstr_substr_char(tmp, NULL, 3) == UNSTRING_FALSE);
+	check_assert(unstr_substr_char(tmp, "", 3) == UNSTRING_FALSE);
 
-	test_assert(unstr_substr_char(tmp, str, 0) == UNSTRING_TRUE);
-	test_assert(unstr_empty(tmp) == UNSTRING_TRUE);
+	check_assert(unstr_substr_char(tmp, str, 0) == UNSTRING_TRUE);
+	check_assert(unstr_empty(tmp) == UNSTRING_TRUE);
 
-	test_assert(unstr_substr_char(tmp, str, 3) == UNSTRING_TRUE);
+	check_assert(unstr_substr_char(tmp, str, 3) == UNSTRING_TRUE);
 	check_unstr_char(tmp, ans[0]);
 
 	str = "unkokkokussakusa";
-	test_assert(unstr_substr_char(tmp, str, 7) == UNSTRING_TRUE);
+	check_assert(unstr_substr_char(tmp, str, 7) == UNSTRING_TRUE);
 	check_unstr_char(tmp, ans[1]);
 
 	unstr_free(tmp);
@@ -402,17 +428,16 @@ static void test_unstr_strcat(void)
 	unstr_t *tmp = unstr_init_memory(1);
 	unstr_t *emp = unstr_init_memory(1);
 	unstr_t *str = unstr_init(ans[0]);
-	printf("unstr_strcat\n");
-	test_assert(unstr_strcat(NULL, str) == UNSTRING_FALSE);
-	test_assert(unstr_strcat(NULL, tmp) == UNSTRING_FALSE);
-	test_assert(unstr_strcat(tmp, NULL) == UNSTRING_FALSE);
-	test_assert(unstr_strcat(tmp, emp) == UNSTRING_FALSE);
+	check_assert(unstr_strcat(NULL, str) == UNSTRING_FALSE);
+	check_assert(unstr_strcat(NULL, tmp) == UNSTRING_FALSE);
+	check_assert(unstr_strcat(tmp, NULL) == UNSTRING_FALSE);
+	check_assert(unstr_strcat(tmp, emp) == UNSTRING_FALSE);
 
-	test_assert(unstr_strcat(tmp, str) == UNSTRING_TRUE);
+	check_assert(unstr_strcat(tmp, str) == UNSTRING_TRUE);
 	check_int(unstr_strlen(tmp), unstr_strlen(str));
 	check_unstr(tmp, str);
 
-	test_assert(unstr_strcat(tmp, str) == UNSTRING_TRUE);
+	check_assert(unstr_strcat(tmp, str) == UNSTRING_TRUE);
 	check_int(unstr_strlen(tmp), strlen(ans[1]));
 	check_unstr_char(tmp, ans[1]);
 
@@ -426,17 +451,16 @@ static void test_unstr_strcat_char(void)
 		"12345678901234567890",
 	};
 	unstr_t *tmp = unstr_init_memory(1);
-	printf("unstr_strcat_char\n");
-	test_assert(unstr_strcat_char(NULL, ans[0]) == UNSTRING_FALSE);
-	test_assert(unstr_strcat_char(NULL, "") == UNSTRING_FALSE);
-	test_assert(unstr_strcat_char(tmp, NULL) == UNSTRING_FALSE);
-	test_assert(unstr_strcat_char(tmp, "") == UNSTRING_FALSE);
+	check_assert(unstr_strcat_char(NULL, ans[0]) == UNSTRING_FALSE);
+	check_assert(unstr_strcat_char(NULL, "") == UNSTRING_FALSE);
+	check_assert(unstr_strcat_char(tmp, NULL) == UNSTRING_FALSE);
+	check_assert(unstr_strcat_char(tmp, "") == UNSTRING_FALSE);
 
-	test_assert(unstr_strcat_char(tmp, ans[0]) == UNSTRING_TRUE);
+	check_assert(unstr_strcat_char(tmp, ans[0]) == UNSTRING_TRUE);
 	check_int(unstr_strlen(tmp), strlen(ans[0]));
 	check_unstr_char(tmp, ans[0]);
 
-	test_assert(unstr_strcat_char(tmp, ans[0]) == UNSTRING_TRUE);
+	check_assert(unstr_strcat_char(tmp, ans[0]) == UNSTRING_TRUE);
 	check_int(unstr_strlen(tmp), strlen(ans[1]));
 	check_unstr_char(tmp, ans[1]);
 
@@ -449,16 +473,15 @@ static void test_unstr_strcmp(void)
 	unstr_t *ans = unstr_copy(str);
 	unstr_t *ans_fail = unstr_init("1234567891");
 	unstr_t *emp = unstr_init_memory(1);
-	printf("unstr_strcmp\n");
-	test_assert(unstr_strcmp(NULL, str) == 0x100);
-	test_assert(unstr_strcmp(NULL, emp) == 0x100);
-	test_assert(unstr_strcmp(str, NULL) == 0x100);
-	test_assert(unstr_strcmp(str, emp) == 0x100);
-	test_assert(unstr_strcmp(emp, str) == 0x100);
+	check_assert(unstr_strcmp(NULL, str) == 0x100);
+	check_assert(unstr_strcmp(NULL, emp) == 0x100);
+	check_assert(unstr_strcmp(str, NULL) == 0x100);
+	check_assert(unstr_strcmp(str, emp) == 0x100);
+	check_assert(unstr_strcmp(emp, str) == 0x100);
 
-	test_assert(unstr_strcmp(str, ans) == 0);
-	test_assert(unstr_strcmp(str, ans_fail) < 0);
-	test_assert(unstr_strcmp(ans_fail, str) > 0);
+	check_assert(unstr_strcmp(str, ans) == 0);
+	check_assert(unstr_strcmp(str, ans_fail) < 0);
+	check_assert(unstr_strcmp(ans_fail, str) > 0);
 
 	unstr_delete(4, str, ans, ans_fail, emp);
 }
@@ -469,15 +492,14 @@ static void test_unstr_strcmp_char(void)
 	char *ans_fail = "1234567891";
 	unstr_t *str = unstr_init(ans);
 	unstr_t *emp = unstr_init_memory(1);
-	printf("unstr_strcmp_char\n");
-	test_assert(unstr_strcmp_char(NULL, ans) == 0x100);
-	test_assert(unstr_strcmp_char(NULL, "") == 0x100);
-	test_assert(unstr_strcmp_char(str, NULL) == 0x100);
-	test_assert(unstr_strcmp_char(str, "") == 0x100);
-	test_assert(unstr_strcmp_char(emp, ans) == 0x100);
+	check_assert(unstr_strcmp_char(NULL, ans) == 0x100);
+	check_assert(unstr_strcmp_char(NULL, "") == 0x100);
+	check_assert(unstr_strcmp_char(str, NULL) == 0x100);
+	check_assert(unstr_strcmp_char(str, "") == 0x100);
+	check_assert(unstr_strcmp_char(emp, ans) == 0x100);
 
-	test_assert(unstr_strcmp_char(str, ans) == 0);
-	test_assert(unstr_strcmp_char(str, ans_fail) < 0);
+	check_assert(unstr_strcmp_char(str, ans) == 0);
+	check_assert(unstr_strcmp_char(str, ans_fail) < 0);
 
 	unstr_delete(2, str, emp);
 }
@@ -492,7 +514,6 @@ static void test_unstr_strstr(void)
 	unstr_t *s2 = unstr_init("7890");
 	unstr_t *s3 = unstr_init("hoge");
 	unstr_t *emp = unstr_init_memory(1);
-	printf("unstr_strstr\n");
 	check_null(unstr_strstr(NULL, str));
 	check_null(unstr_strstr(NULL, emp));
 	check_null(unstr_strstr(str, NULL));
@@ -502,11 +523,11 @@ static void test_unstr_strstr(void)
 	check_null(unstr_strstr(str, s3));
 
 	ret = unstr_strstr(str, s1);
-	test_assert(ret != NULL);
+	check_assert(ret != NULL);
 	check_char(ret, ans1);
 
 	ret = unstr_strstr(str, s2);
-	test_assert(ret != NULL);
+	check_assert(ret != NULL);
 	check_char(ret, ans2);
 
 	unstr_delete(5, str, s1, s2, s3, emp);
@@ -522,7 +543,6 @@ static void test_unstr_strstr_char(void)
 	char *s3 = "hoge";
 	unstr_t *str = unstr_init("1234567890");
 	unstr_t *emp = unstr_init_memory(1);
-	printf("unstr_strstr_char\n");
 	check_null(unstr_strstr_char(NULL, s1));
 	check_null(unstr_strstr_char(NULL, ""));
 	check_null(unstr_strstr_char(str, NULL));
@@ -532,11 +552,11 @@ static void test_unstr_strstr_char(void)
 	check_null(unstr_strstr_char(str, s3));
 
 	ret = unstr_strstr_char(str, s1);
-	test_assert(ret != NULL);
+	check_assert(ret != NULL);
 	check_char(ret, ans1);
 
 	ret = unstr_strstr_char(str, s2);
-	test_assert(ret != NULL);
+	check_assert(ret != NULL);
 	check_char(ret, ans2);
 
 	unstr_delete(2, str, emp);
@@ -551,7 +571,6 @@ static void test_unstr_explode(void)
 	char *ans[11] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0", ""};
 	unstr_t *emp = unstr_init_memory(1);
 	unstr_t **ret = 0;
-	printf("unstr_explode\n");
 	check_null(unstr_explode(NULL, delim, &len));
 	check_null(unstr_explode(emp, delim, &len));
 	check_null(unstr_explode(str, NULL, &len));
@@ -560,7 +579,7 @@ static void test_unstr_explode(void)
 
 	len = 1234;
 	ret = unstr_explode(str, delim, &len);
-	test_assert(len < 1234);
+	check_assert(len < 1234);
 	for(i = 0; i < len; i++){
 		check_unstr_char(ret[i], ans[i]);
 		unstr_free(ret[i]);
@@ -573,13 +592,12 @@ static void test_unstr_sprintf(void)
 {
 	unstr_t *tmp = 0;
 	unstr_t *p1 = 0;
-	printf("unstr_sprintf\n");
 
 	tmp = unstr_sprintf(NULL, NULL);
-	test_assert(tmp == NULL);
+	check_assert(tmp == NULL);
 
 	tmp = unstr_sprintf(NULL, "");
-	test_assert(tmp != NULL);
+	check_assert(tmp != NULL);
 	unstr_free(tmp);
 
 	tmp = unstr_sprintf(NULL, "|%d|", 1234567890);
@@ -621,7 +639,6 @@ static void test_unstr_sscanf(void)
 	unstr_t *p1 = unstr_init_memory(1);
 	unstr_t *p2 = unstr_init_memory(1);
 	unstr_t *p3 = unstr_init_memory(1);
-	printf("unstr_sscanf\n");
 
 	ret = unstr_sscanf(NULL, "<>$<>", p1);
 	check_int(ret, 0);
@@ -638,7 +655,7 @@ static void test_unstr_sscanf(void)
 
 	ret = unstr_sscanf(source2, "$<>$<><>$", p1, p2, p3);
 	check_int(ret, 2);
-	test_assert(unstr_empty(p1) == UNSTRING_TRUE);
+	check_assert(unstr_empty(p1) == UNSTRING_TRUE);
 	check_unstr_char(p2, "unko<>hoge");
 
 	ret = unstr_sscanf(source3, "$<>$<>$", p1, p2, p3);
@@ -650,7 +667,7 @@ static void test_unstr_sscanf(void)
 	ret = unstr_sscanf(source4, "$<>$<>$", p1, p2, p3);
 	check_int(ret, 3);
 	check_unstr_char(p1, "unko");
-	test_assert(unstr_empty(p2) == UNSTRING_TRUE);
+	check_assert(unstr_empty(p2) == UNSTRING_TRUE);
 	check_unstr_char(p3, "fuga");
 
 	ret = unstr_sscanf(source5, "$$$$$$", p1, p2, p3);
@@ -669,7 +686,6 @@ static void test_unstr_reverse(void)
 	unstr_t *emp = unstr_init_memory(1);
 	unstr_t *source1 = unstr_init("1234567890");
 	unstr_t *source2 = unstr_init("123456789");
-	printf("unstr_reverse\n");
 
 	ret = unstr_reverse(NULL);
 	check_null(ret);
@@ -698,7 +714,6 @@ static void test_unstr_reverse(void)
 static void test_unstr_itoa(void)
 {
 	unstr_t *ret = 0;
-	printf("unstr_itoa\n");
 
 	ret = unstr_itoa(0, 1);
 	check_null(ret);
@@ -734,7 +749,6 @@ static void test_unstr_replace(void)
 	unstr_t *data = unstr_init_memory(1);
 	unstr_t *search = unstr_init_memory(1);
 	unstr_t *replace = unstr_init_memory(1);
-	printf("unstr_replace\n");
 
 	unstr_strcpy_char(data, "unkokkokokkokokkokokekokko");
 	unstr_strcpy_char(search, "ko");
@@ -776,15 +790,14 @@ static void test_unstr_strpos(void)
 	unstr_t *emp = unstr_init_memory(1);
 	unstr_t *text = unstr_init_memory(1);
 	unstr_t *search = unstr_init_memory(1);
-	printf("unstr_strpos\n");
 
 	unstr_strcpy_char(text, "0123456789");
 	unstr_strcpy_char(search, "34");
 
-	test_assert(unstr_strpos(NULL, search) < 0);
-	test_assert(unstr_strpos(emp, search) < 0);
-	test_assert(unstr_strpos(text, NULL) < 0);
-	test_assert(unstr_strpos(text, emp) < 0);
+	check_assert(unstr_strpos(NULL, search) < 0);
+	check_assert(unstr_strpos(emp, search) < 0);
+	check_assert(unstr_strpos(text, NULL) < 0);
+	check_assert(unstr_strpos(text, emp) < 0);
 
 	unstr_strcpy_char(text, "0123456789");
 	unstr_strcpy_char(search, "34");
@@ -796,7 +809,7 @@ static void test_unstr_strpos(void)
 
 	unstr_strcpy_char(text, "0123456789");
 	unstr_strcpy_char(search, "aaa");
-	test_assert(unstr_strpos(text, search) < 0);
+	check_assert(unstr_strpos(text, search) < 0);
 
 	unstr_delete(3, emp, text, search);
 }
@@ -806,7 +819,6 @@ static void test_unstr_substr_count(void)
 	unstr_t *emp = unstr_init_memory(1);
 	unstr_t *text = unstr_init_memory(1);
 	unstr_t *search = unstr_init_memory(1);
-	printf("unstr_substr_count\n");
 
 	unstr_strcpy_char(text, "unkokkokokkokokkokokekokko");
 	unstr_strcpy_char(search, "ko");
@@ -827,7 +839,6 @@ static void test_unstr_substr_count_char(void)
 	unstr_t *emp = unstr_init_memory(1);
 	unstr_t *text = unstr_init("unkokkokokkokokkokokekokko");
 	char *search = "ko";
-	printf("unstr_substr_count_char\n");
 
 	check_int(unstr_substr_count_char(NULL, search), 0);
 	check_int(unstr_substr_count_char(emp, search), 0);
@@ -847,7 +858,6 @@ static void test_unstr_strtok(void)
 	unstr_t *text = unstr_init("1<>2<>3<>4<>5<>6<>7<>8<>9<>0");
 	char *search = "<>";
 	char *ans[11] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0", ""};
-	printf("unstr_strtok\n");
 
 	ret = unstr_strtok(NULL, search, &index);
 	check_null(ret);
@@ -882,7 +892,6 @@ static void test_unstr_repeat(void)
 	unstr_t *ret = 0;
 	unstr_t *emp = unstr_init_memory(1);
 	unstr_t *str = unstr_init("unko");
-	printf("unstr_repeat\n");
 
 	ret = unstr_repeat(NULL, 10);
 	check_null(ret);
@@ -905,7 +914,6 @@ static void test_unstr_repeat_char(void)
 {
 	unstr_t *ret = 0;
 	char *str = "unko";
-	printf("unstr_repeat_char\n");
 
 	ret = unstr_repeat_char(NULL, 10);
 	check_null(ret);
